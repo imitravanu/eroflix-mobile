@@ -1,0 +1,47 @@
+{
+  "compose_bom": {
+    "stable": "2026.09.00",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/compose/compose-bom/maven-metadata.xml",
+    "resolved": true
+  },
+  "activity": {
+    "stable": "1.13.0",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/activity/activity-compose/maven-metadata.xml",
+    "resolved": true
+  },
+  "lifecycle": {
+    "stable": "2.11.0",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/lifecycle/lifecycle-viewmodel-compose/maven-metadata.xml",
+    "resolved": true
+  },
+  "navigation": {
+    "stable": "2.10.2",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/navigation/navigation-compose/maven-metadata.xml",
+    "resolved": true
+  },
+  "media3": {
+    "stable": "1.11.1",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/media3/media3-exoplayer/maven-metadata.xml",
+    "resolved": true
+  },
+  "sqlite": {
+    "stable": "2.7.1",
+    "source": "https://dl.google.com/dl/android/maven2/androidx/sqlite/sqlite-bundled/maven-metadata.xml",
+    "resolved": true
+  },
+  "coroutines": {
+    "stable": "1.11.0",
+    "source": "https://repo.maven.apache.org/maven2/org/jetbrains/kotlinx/kotlinx-coroutines-core/maven-metadata.xml",
+    "resolved": true
+  },
+  "okhttp": {
+    "stable": "5.5.1",
+    "source": "https://repo.maven.apache.org/maven2/com/squareup/okhttp3/okhttp/maven-metadata.xml",
+    "resolved": true
+  },
+  "agp": {
+    "stable": null,
+    "source": "https://dl.google.com/dl/android/maven2/com/android/tools/build/gradle/9.4.0/gradle-9.4.0.pom",
+    "resolved": true
+  }
+}

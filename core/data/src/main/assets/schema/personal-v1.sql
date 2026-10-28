@@ -1,0 +1,10 @@
+CREATE TABLE personal_meta(id INTEGER PRIMARY KEY CHECK(id=1),revision INTEGER NOT NULL);
+INSERT INTO personal_meta VALUES (1,0);
+CREATE TABLE user_state(title_id TEXT PRIMARY KEY,favorite INTEGER NOT NULL DEFAULT 0,saved INTEGER NOT NULL DEFAULT 0,hidden INTEGER NOT NULL DEFAULT 0,hidden_at_ms INTEGER,position_ms INTEGER NOT NULL DEFAULT 0 CHECK(position_ms>=0),duration_ms INTEGER,last_watched_ms INTEGER,watched INTEGER NOT NULL DEFAULT 0,watch_cycle TEXT NOT NULL DEFAULT 'initial',auto_hide_suppressed INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX ix_user_hidden ON user_state(hidden,title_id);
+CREATE TABLE retained_titles(title_id TEXT PRIMARY KEY,title TEXT NOT NULL,year INTEGER,duration_ms INTEGER,poster_url TEXT,local_poster TEXT,details_json TEXT);
+CREATE TABLE watched_intervals(title_id TEXT NOT NULL,timeline_id TEXT NOT NULL,watch_cycle TEXT NOT NULL,start_ms INTEGER NOT NULL,end_ms INTEGER NOT NULL,PRIMARY KEY(title_id,timeline_id,watch_cycle,start_ms));
+CREATE TABLE download_intents(job_id TEXT PRIMARY KEY,media3_request_id TEXT UNIQUE,title_id TEXT NOT NULL,source_snapshot TEXT NOT NULL,selected_tracks TEXT NOT NULL,enqueue_order INTEGER NOT NULL,user_stop_reason TEXT,desired_state TEXT NOT NULL,updated_at_ms INTEGER NOT NULL);
+CREATE TABLE export_jobs(job_id TEXT PRIMARY KEY,download_id TEXT NOT NULL,destination_uri TEXT,mime_type TEXT,container TEXT,staging_reference TEXT,state TEXT NOT NULL,error TEXT,created_at_ms INTEGER NOT NULL,updated_at_ms INTEGER NOT NULL);
+CREATE TABLE source_observations(source_id TEXT PRIMARY KEY,capabilities_json TEXT,duration_ms INTEGER,expires_at_ms INTEGER,diagnostic TEXT,observed_at_ms INTEGER NOT NULL);
+PRAGMA user_version=1;

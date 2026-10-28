@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "agp": "9.4.0",
+  "sdk_packages": [
+    "platform-tools",
+    "platforms;android-37.0",
+    "build-tools;36.0.0"
+  ],
+  "jdk": {
+    "version": "jdk-17.0.21+9",
+    "filename": "OpenJDK17U-jdk_x64_linux_hotspot_17.0.21_9.tar.gz",
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.21_9.tar.gz",
+    "sha256": "8b9b611d917e3dfd8419d3566b5949226f69b052fed7e109c1368add1dfe8711",
+    "archive_root": "jdk-17.0.21+9",
+    "directory": "jdk-17"
+  },
+  "gradle": {
+    "version": "9.6.0",
+    "filename": "gradle-9.6.0-bin.zip",
+    "url": "https://services.gradle.org/distributions/gradle-9.6.0-bin.zip",
+    "sha256": "bbaeb2fef8710818cf0e261201dab964c572f92b942812df0c3620d62a529a01",
+    "archive_root": "gradle-9.6.0",
+    "directory": "gradle-9.6.0"
+  },
+  "command_line_tools": {
+    "version": "15859902",
+    "filename": "commandlinetools-linux-15859902_latest.zip",
+    "url": "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip",
+    "sha256": "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583",
+    "archive_root": "cmdline-tools",
+    "directory": "android-sdk/cmdline-tools/15859902"
+  },
+  "sdk_expected_revisions": {
+    "platform-tools": "37.0.1",
+    "platforms;android-37.0": "2",
+    "build-tools;36.0.0": "36.0.0"
+  }
+}

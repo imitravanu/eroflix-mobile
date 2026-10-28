@@ -1,0 +1,19 @@
+# Keep the planned Android module visible despite the parent data/ ignore rule.
+!core/data/
+!core/data/**
+
+.gradle/
+.kotlin/
+.idea/
+.cxx/
+.externalNativeBuild/
+**/build/
+local.properties
+keystore.properties
+*.jks
+*.keystore
+local-data/
+artifacts/
+captures/
+__pycache__/
+*.pyc

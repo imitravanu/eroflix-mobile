@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity android:name=".ProductionPlayerHarnessActivity" android:exported="false" android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />
+        <activity android:name=".SourceLabActivity" android:exported="false" />
+        <activity android:name=".FingerprintHarnessActivity" android:exported="false" />
+    </application>
+</manifest>
