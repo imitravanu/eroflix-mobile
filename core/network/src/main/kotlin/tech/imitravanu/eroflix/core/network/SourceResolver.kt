@@ -52,7 +52,6 @@ class CatalogSourceResolver(private val http: SourceHttp = SourceHttp(),
             val native=resolveNative(source,url,mediaPolicy,expiry,purpose)
             if(native is Resolution.NativeMedia) return native
         }
-        if(family in setOf("fullerotic","porntrex")) return unavailable(ErrorCode.UNSUPPORTED,"This provider's dynamic player is not supported in this build. Choose another source.")
         if(purpose==ResolvePurpose.DOWNLOAD) return unavailable(ErrorCode.UNSUPPORTED,"This provider currently requires its web player; native downloads are unavailable.")
         return Resolution.WebEmbed(page.url,"embed:$family:v1","Provider web player. Native quality, native gestures, offline downloads and export are unavailable. Playback still requires device verification.")
     }

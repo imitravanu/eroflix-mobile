@@ -7,6 +7,7 @@ export ANDROID_HOME="$EROFLIX_TOOLS/android-sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export ANDROID_USER_HOME="$EROFLIX_TOOLS/android-user"
 export GRADLE_USER_HOME="$EROFLIX_TOOLS/gradle-user"
+export ANDROID_SERIAL="${ANDROID_SERIAL:-10.153.0.113:5555}"
 export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/15859902/bin:$EROFLIX_TOOLS/gradle-9.6.0/bin:$PATH"
 if [ ! -x "$JAVA_HOME/bin/java" ]; then
     echo 'Run python3 tools/dev/setup.py first.' >&2

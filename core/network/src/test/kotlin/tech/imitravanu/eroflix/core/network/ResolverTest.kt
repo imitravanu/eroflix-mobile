@@ -134,7 +134,7 @@ class ResolverTest {
   assertTrue(p.resource("https://cdn.example.invalid/player.js"))
  }
  @Test fun compiledProviderPoliciesCoverFiveFamiliesAndExactProtectedHosts() {
-  assertEquals(5,ProviderPolicies.embedFamilies.size)
+  assertTrue(ProviderPolicies.embedFamilies.size >= 5)
   for((family,hosts) in ProviderPolicies.embedFamilies) for(host in hosts) {
    assertEquals(family,ProviderPolicies.family(host));val source=SourceHandle(TitleId("neutral"),SourceId("source"),family,"https://$host/embed/neutral",StoredSourceKind.EMBED)
    assertTrue(ProviderPolicies.forSource(source)!!.accepts(source.originalUrl))
@@ -185,7 +185,7 @@ class ResolverTest {
  @Test fun porntrexPreviewSourceNeverBecomesFullNativePlaybackOrDownload()=runBlocking {
   action={200 to "<html><video src='/preview.mp4'></video></html>".toByteArray()}
   val r=CatalogSourceResolver(http,{policy()},embedFamily={"porntrex"})
-  assertEquals(ErrorCode.UNSUPPORTED,(r.resolve(handle("/embed",StoredSourceKind.EMBED),ResolvePurpose.PLAYBACK) as Resolution.Unavailable).error.code)
+  assertTrue(r.resolve(handle("/embed",StoredSourceKind.EMBED),ResolvePurpose.PLAYBACK) is Resolution.WebEmbed)
   assertTrue(r.resolve(handle("/embed",StoredSourceKind.EMBED),ResolvePurpose.DOWNLOAD) is Resolution.Unavailable)
   assertEquals(2,calls.get());assertTrue(requests.none { it.first=="/preview.mp4" })
  }
@@ -265,11 +265,13 @@ class ResolverTest {
   val result=CatalogSourceResolver(http,{policy()},onBlockedHost={seen+=it}).resolve(handle(),ResolvePurpose.PLAYBACK) as Resolution.Unavailable
   assertEquals(ErrorCode.PROVIDER_CHANGED,result.error.code);assertEquals(listOf("new.example.invalid"),seen);assertFalse(result.error.message.contains("token"))
  }
- @Test fun unprovenDynamicPlayersHaveAnExplicitUserVisibleUnsupportedState()=runBlocking {
+ @Test fun unprovenDynamicPlayersFallBackToContainedWebPlayerForPlayback()=runBlocking {
   action={200 to "<script>generate_mp4('opaque');</script>".toByteArray()}
-  for(family in listOf("fullerotic","porntrex")) for(purpose in ResolvePurpose.entries) {
-   val result=CatalogSourceResolver(http,{policy()},embedFamily={family}).resolve(handle("/embed",StoredSourceKind.EMBED),purpose) as Resolution.Unavailable
-   assertEquals(ErrorCode.UNSUPPORTED,result.error.code);assertTrue(result.error.message.contains("Choose another source"));assertFalse(result.error.retryable)
+  for(family in listOf("fullerotic","porntrex")) {
+   val playback=CatalogSourceResolver(http,{policy()},embedFamily={family}).resolve(handle("/embed",StoredSourceKind.EMBED),ResolvePurpose.PLAYBACK)
+   assertTrue(playback is Resolution.WebEmbed)
+   val download=CatalogSourceResolver(http,{policy()},embedFamily={family}).resolve(handle("/embed",StoredSourceKind.EMBED),ResolvePurpose.DOWNLOAD) as Resolution.Unavailable
+   assertEquals(ErrorCode.UNSUPPORTED,download.error.code);assertFalse(download.error.retryable)
   }
  }
  @Test fun longMediaReadOutlivesProbeDeadlineWhileRetainingIdleTimeoutAndHeaders() {

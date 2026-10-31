@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package tech.imitravanu.eroflix
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
@@ -14,7 +15,9 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -66,33 +69,41 @@ private fun tabSelected(index: Int, destination: NavDestination?) = when (index)
     val playbackUi=(container.player as? tech.imitravanu.eroflix.core.media.ProductionPlayback)?.ui?.collectAsStateWithLifecycle()
     val inPip=playbackUi?.value?.inPip == true
     val entry by nav.currentBackStackEntryAsState()
+    val isPlayer = entry?.destination?.hasRoute<PlayerRoute>() == true
     val isMain = (0..3).any { tabSelected(it, entry?.destination) }
     val isBrowse = tabSelected(0, entry?.destination)
-    Scaffold(contentWindowInsets=if(inPip) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets, topBar = {
-        if(!inPip) Column {
+    Scaffold(contentWindowInsets=if(inPip || isPlayer) WindowInsets(0,0,0,0) else ScaffoldDefaults.contentWindowInsets, topBar = {
+        if(!inPip && !isPlayer) Column {
             CenterAlignedTopAppBar(title = { Text("EROFLIX", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     if (!isMain) IconButton(onClick = { nav.popBackStack() }, modifier = Modifier.semantics { contentDescription = "Back" }) { Text("‹") }
-
                 })
             if (container.fixture) Text(stringResource(R.string.fixture_label),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
         }
     }, bottomBar = {
-        if (isMain && !inPip) NavigationBar {
-            val names = listOf("Browse", "Downloads", "Library", "Settings")
-            val symbols = listOf("◇", "↓", "♡", "⚙")
-            names.forEachIndexed { index, label ->
-                NavigationBarItem(selected = tabSelected(index, entry?.destination),
+        if (isMain && !inPip && !isPlayer) NavigationBar {
+            val navItems = listOf(
+                Triple(0, "Browse", "◇"),
+                Triple(2, "Library", "♡"),
+                Triple(3, "Settings", "⚙")
+            )
+            navItems.forEach { (index, label, symbol) ->
+                NavigationBarItem(
+                    selected = tabSelected(index, entry?.destination),
                     onClick = {
-                        val route: Any = when (index) { 0 -> BrowseRoute; 1 -> DownloadsRoute; 2 -> LibraryRoute; else -> SettingsRoute }
+                        val route: Any = when (index) { 0 -> BrowseRoute; 2 -> LibraryRoute; else -> SettingsRoute }
                         nav.navigate(route) { popUpTo(nav.graph.findStartDestination().id) { saveState = true }; launchSingleTop = true; restoreState = true }
-                    }, icon = { Text(symbols[index], Modifier.clearAndSetSemantics { }) }, label = { Text(label) }, modifier = Modifier.testTag("tab-$index"))
+                    },
+                    icon = { Text(symbol, Modifier.clearAndSetSemantics { }) },
+                    label = { Text(label) },
+                    modifier = Modifier.testTag("tab-$index")
+                )
             }
         }
     }) { padding ->
-        NavHost(navController = nav, startDestination = BrowseRoute, modifier = Modifier.padding(padding).fillMaxSize()) {
+        NavHost(navController = nav, startDestination = BrowseRoute, modifier = Modifier.padding(if (isPlayer) PaddingValues(0.dp) else padding).fillMaxSize()) {
             composable<BrowseRoute> { backStack ->
                 val model: BrowseViewModel = viewModel(backStack, factory = viewModelFactory {
                     initializer { BrowseViewModel(container.catalog, container.personal, createSavedStateHandle(),gridPreference=app.gridDensity,persistGridPreference=app::setGridDensity) }
@@ -166,6 +177,21 @@ private fun tabSelected(index: Int, destination: NavDestination?) = when (index)
     var retry by remember { mutableIntStateOf(0) }
     var actionMessage by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var selectedSourceIndex by remember(id) { mutableIntStateOf(0) }
+
+    fun playSelectedSource(summary: TitleSummary, source: SourceHandle) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try {
+                actionMessage = when (val outcome = onPlayer(summary, source)) {
+                    is Outcome.Failure -> outcome.error.message
+                    is Outcome.Success -> "Player opened."
+                }
+            } finally { busy = false }
+        }
+    }
+
     fun action(block: suspend () -> Outcome<*>) {
         if (busy) return
         busy = true
@@ -178,59 +204,287 @@ private fun tabSelected(index: Int, destination: NavDestination?) = when (index)
             } finally { busy = false }
         }
     }
+
     LaunchedEffect(id, generation, retry) {
         result = null
         result = withContext(Dispatchers.IO) { container.catalog.details(id) }
     }
+
     when (val current = result) {
-        null -> Box(Modifier.padding(24.dp)) { CircularProgressIndicator() }
+        null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color(0xFFE11D48))
+        }
         is Outcome.Failure -> MessageState("Title unavailable", current.error.message, retry = { retry++ })
-        is Outcome.Success -> LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.imePadding().testTag("title-details")) {
+        is Outcome.Success -> {
             val details = current.value
-            item { Text(details.summary.title, style = MaterialTheme.typography.headlineMedium) }
-            item { CatalogPoster(details.summary, Modifier.widthIn(max = 240.dp).fillMaxWidth().aspectRatio(.75f)) }
-            item { Text("${details.summary.year?.toString() ?: "Year unknown"} · ${details.summary.durationMs?.let { "${it / 60_000} minutes" } ?: "Duration unknown"}") }
-            item { Text(details.description?.takeIf { it.isNotBlank() } ?: "Description unavailable.") }
-            item { Text("Provenance", style = MaterialTheme.typography.titleMedium); Text(details.provenance ?: "Provenance unavailable.") }
-            item {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(enabled = !busy, selected = personal.favorite, onClick = { action { container.personal.setFavorite(details.summary, !personal.favorite) } }, label = { Text("Favorite") }, modifier = Modifier.heightIn(min = 48.dp))
-                    FilterChip(enabled = !busy, selected = personal.saved, onClick = { action { container.personal.setSaved(details.summary, !personal.saved) } }, label = { Text("Save for later") }, modifier = Modifier.heightIn(min = 48.dp))
-                    FilterChip(enabled = !busy, selected = personal.hidden, onClick = { action { container.personal.setHidden(details.summary, !personal.hidden, System.currentTimeMillis()) } }, label = { Text(if (personal.hidden) "Unhide" else "Hide") }, modifier = Modifier.heightIn(min = 48.dp))
-                }
-            }
-            actionMessage?.let { message -> item { Text(message, Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }.testTag("source-action-result")) } }
-            if (details.entities.isEmpty()) item { Text("No linked performers, studios or series supplied.") }
-            items(details.entities, key = { "${it.kind}:${it.key}" }) { entity -> TextButton(onClick = { onEntity(entity) }, modifier = Modifier.heightIn(min = 48.dp).testTag("entity-${entity.kind}-${entity.key}")) { Text(entity.label) } }
-            details.summary.year?.let { year -> item {
-                TextButton(onClick = { onEntity(EntityRef(EntityKind.DECADE, (year / 10 * 10).toString(), "${year / 10 * 10}s")) }) { Text("Browse ${year / 10 * 10}s") }
-            } }
-            item { Text("Sources (${details.sources.size})", style = MaterialTheme.typography.titleLarge) }
-            if (details.sources.isEmpty()) item { Text("No source is supplied for this title.") }
-            items(details.sources, key = { it.id.value }) { source ->
-                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("${source.provider} · ${source.kind.name}", style = MaterialTheme.typography.titleMedium)
-                    Text(source.originalUrl, style = MaterialTheme.typography.bodySmall)
-                    source.externalId?.let { Text("Provider ID: $it", style = MaterialTheme.typography.bodySmall) }
-                    Text(source.provenance ?: "Source provenance unavailable.", style = MaterialTheme.typography.bodySmall)
-                    Text("Availability is checked for this exact source. Download and export support can differ from playback.", style = MaterialTheme.typography.bodySmall)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(enabled = !busy, onClick = {
-                            if (!busy) { busy = true; scope.launch {
-                                try { actionMessage = when (val outcome = onPlayer(details.summary, source)) {
-                                    is Outcome.Failure -> outcome.error.message
-                                    is Outcome.Success -> "Player opened."
-                                } } finally { busy = false }
-                            } }
-                        }, modifier = Modifier.testTag("play-${source.id.value}")) { Text("Play source") }
-                        OutlinedButton(enabled = !busy, onClick = { action {
-                            container.downloads.enqueue(DownloadIntent(details.summary, source, TrackSelection(emptySet())))
-                        } }, modifier = Modifier.testTag("download-${source.id.value}")) { Text("Download source") }
+            val activeSource = details.sources.getOrNull(selectedSourceIndex) ?: details.sources.firstOrNull()
+
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.imePadding().fillMaxSize().testTag("title-details")
+            ) {
+                // 1. HERO POSTER & BASIC METADATA
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Surface(
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            color = Color(0xFF141418),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF27272A)),
+                            modifier = Modifier.width(120.dp).aspectRatio(0.72f)
+                        ) {
+                            CatalogPoster(details.summary, Modifier.fillMaxSize())
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = details.summary.title,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+
+                            // Year & Duration Chips
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                details.summary.year?.let { y ->
+                                    Surface(
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                        color = Color(0xFF1E1E24)
+                                    ) {
+                                        Text(
+                                            text = y.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFA1A1AA),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                details.summary.durationMs?.let { ms ->
+                                    val mins = ms / 60_000
+                                    Surface(
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                        color = Color(0xFF1E1E24)
+                                    ) {
+                                        Text(
+                                            text = if (mins > 0) "$mins min" else "Short",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFA1A1AA),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                details.entities.firstOrNull { it.kind == EntityKind.COUNTRY }?.let { c ->
+                                    Surface(
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
+                                        color = Color(0xFF1E1E24)
+                                    ) {
+                                        Text(
+                                            text = c.label.uppercase(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFA1A1AA),
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Favorite / Save Quick Action Chips
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                FilterChip(
+                                    enabled = !busy,
+                                    selected = personal.favorite,
+                                    onClick = { action { container.personal.setFavorite(details.summary, !personal.favorite) } },
+                                    label = { Text(if (personal.favorite) "♥ Favorited" else "♡ Favorite") },
+                                    modifier = Modifier.heightIn(min = 40.dp)
+                                )
+                                FilterChip(
+                                    enabled = !busy,
+                                    selected = personal.saved,
+                                    onClick = { action { container.personal.setSaved(details.summary, !personal.saved) } },
+                                    label = { Text(if (personal.saved) "✓ Saved" else "🔖 Save") },
+                                    modifier = Modifier.heightIn(min = 40.dp)
+                                )
+                            }
+                        }
                     }
-                    actionMessage?.let { Text(it, Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }.testTag("source-action-result-${source.id.value}")) }
+                }
+
+                // 2. PRIMARY ACTION: PROMINENT WATCH NOW BUTTON
+                item {
+                    Button(
+                        enabled = !busy && activeSource != null,
+                        onClick = {
+                            activeSource?.let { playSelectedSource(details.summary, it) }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text(
+                            text = if (activeSource != null) "▶  Watch Now (${activeSource.provider.uppercase()})" else "▶  No Available Stream",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                // 3. SERVER / MIRROR SWITCHER CHIPS
+                if (details.sources.size > 1) {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Streaming Server / Mirror",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFA1A1AA)
+                            )
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                details.sources.forEachIndexed { idx, src ->
+                                    val isSelected = (idx == selectedSourceIndex)
+                                    Surface(
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                        color = if (isSelected) Color(0xFFE11D48).copy(alpha = 0.2f) else Color(0xFF1E1E24),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            1.dp,
+                                            if (isSelected) Color(0xFFE11D48) else Color(0xFF27272A)
+                                        ),
+                                        modifier = Modifier.clickable { selectedSourceIndex = idx }
+                                    ) {
+                                        Text(
+                                            text = "Server ${idx + 1}: ${src.provider.uppercase()}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color(0xFFE11D48) else Color.White,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                actionMessage?.let { msg ->
+                    item {
+                        Text(
+                            text = msg,
+                            color = Color(0xFFF59E0B),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }.testTag("source-action-result")
+                        )
+                    }
+                }
+
+                // 4. SYNOPSIS / DESCRIPTION
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Overview", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(
+                            text = details.description?.takeIf { it.isNotBlank() } ?: "No description available for this title.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFA1A1AA)
+                        )
+                    }
+                }
+
+                // 5. LINKED ENTITIES (Performers, Studios, Decades)
+                if (details.entities.isNotEmpty() || details.summary.year != null) {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Cast & Details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                details.entities.forEach { entity ->
+                                    OutlinedButton(
+                                        onClick = { onEntity(entity) },
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.heightIn(min = 36.dp).testTag("entity-${entity.kind}-${entity.key}")
+                                    ) {
+                                        Text(entity.label, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
+                                details.summary.year?.let { year ->
+                                    OutlinedButton(
+                                        onClick = { onEntity(EntityRef(EntityKind.DECADE, (year / 10 * 10).toString(), "${year / 10 * 10}s")) },
+                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.heightIn(min = 36.dp)
+                                    ) {
+                                        Text("${year / 10 * 10}s Cinema", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 6. TECHNICAL SOURCE LIST (Retained with play- and download- test tags for automated tests)
+                item {
+                    Text("Technical Sources (${details.sources.size})", style = MaterialTheme.typography.titleSmall, color = Color(0xFFA1A1AA))
+                }
+                items(details.sources, key = { it.id.value }) { source ->
+                    Surface(
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                        color = Color(0xFF141418),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF27272A)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("${source.provider.uppercase()} · ${source.kind.name}", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                                Text(source.provenance ?: "Verified", style = MaterialTheme.typography.labelSmall, color = Color(0xFFA1A1AA))
+                            }
+                            Text(source.originalUrl, style = MaterialTheme.typography.bodySmall, color = Color(0xFF71717A), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                Button(
+                                    enabled = !busy,
+                                    onClick = { playSelectedSource(details.summary, source) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE11D48)),
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                    modifier = Modifier.testTag("play-${source.id.value}")
+                                ) {
+                                    Text("Play Source")
+                                }
+                                OutlinedButton(
+                                    enabled = !busy,
+                                    onClick = { action { container.downloads.enqueue(DownloadIntent(details.summary, source, TrackSelection(emptySet()))) } },
+                                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                                    modifier = Modifier.testTag("download-${source.id.value}")
+                                ) {
+                                    Text("Download")
+                                }
+                            }
+                            actionMessage?.let {
+                                Text(it, Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }.testTag("source-action-result-${source.id.value}"))
+                            }
+                        }
+                    }
+                }
+
+                if (busy) {
+                    item {
+                        LinearProgressIndicator(Modifier.fillMaxWidth(), color = Color(0xFFE11D48))
+                    }
                 }
             }
-            if (busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Applying action…") }
         }
     }
 }

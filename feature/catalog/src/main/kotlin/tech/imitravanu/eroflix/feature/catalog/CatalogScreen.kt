@@ -10,7 +10,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -59,9 +61,35 @@ val CatalogWindowEnd = SemanticsPropertyKey<Int>("CatalogWindowEnd")
             }
             heading?.let { Text(it, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelMedium, maxLines = 1) }
         } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { open("Providers") }, modifier = Modifier.testTag("providers-button").heightIn(min = 48.dp)) { Text("Providers") }
-                TextButton(onClick = { open("Filters") }, modifier = Modifier.testTag("filters-button").heightIn(min = 48.dp)) { Text("Filters") }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    color = Color(0xFF1E1E24),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF27272A)),
+                    modifier = Modifier.heightIn(min = 44.dp).testTag("providers-button").combinedClickable(
+                        onClick = { open("Providers") },
+                        onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); open("Providers") },
+                        onLongClickLabel = "Hold to open Providers"
+                    ).semantics { contentDescription = "Providers handle. Tap or hold to open."; role = Role.Button }
+                ) {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                        Text("Providers", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
+                }
+                Surface(
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+                    color = Color(0xFF1E1E24),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF27272A)),
+                    modifier = Modifier.heightIn(min = 44.dp).testTag("filters-button").combinedClickable(
+                        onClick = { open("Filters") },
+                        onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); open("Filters") },
+                        onLongClickLabel = "Hold to open Filters"
+                    ).semantics { contentDescription = "Filters handle. Tap or hold to open."; role = Role.Button }
+                ) {
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
+                        Text("Filters", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    }
+                }
             }
             heading?.let { Text(it, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleLarge) }
             OutlinedTextField(value = query, onValueChange = model::search, label = { Text("Search catalog") }, singleLine = true,
@@ -84,18 +112,6 @@ val CatalogWindowEnd = SemanticsPropertyKey<Int>("CatalogWindowEnd")
                         TextButton(onClick = { model.search(""); model.reset() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Reset search and filters") }
                     }
                 } else CatalogGrid(current, model, density, onTitle, Modifier.weight(1f))
-            }
-        }
-        // Deliberately inside content; no system-edge exclusion or edge interception.
-        if (!compact) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            listOf("Providers", "Filters").forEach { side ->
-                Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.heightIn(min = 48.dp).combinedClickable(
-                        onClick = { open(side) }, onLongClickLabel = "Open $side with feedback",
-                        onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); open(side) })
-                        .semantics { contentDescription = "$side handle. Tap or hold to open." }) {
-                    Text(if (side == "Providers") "› Providers" else "Filters ‹", Modifier.padding(12.dp), style = MaterialTheme.typography.labelLarge)
-                }
             }
         }
     }
